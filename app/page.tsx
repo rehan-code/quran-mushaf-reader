@@ -11,11 +11,19 @@ interface QuranData {
   [pageNumber: string]: PageContent;
 }
 
+const fontClasses: { [key: string]: string } = {
+    'me_quran': 'font-me_quran',
+    'indopak-nastaleeq': 'font-indopak-nastaleeq',
+    'qpc-nastaleeq': 'font-qpc-nastaleeq',
+    'digitalkhatt': 'font-digitalkhatt',
+};
+
 export default function Home() {
   const [quranData, setQuranData] = useState<QuranData>({});
   const [pageNumber, setPageNumber] = useState(1);
   const [inputPage, setInputPage] = useState('1');
   const [style, setStyle] = useState('hafs-digital-khatt');
+  const [font, setFont] = useState('me_quran');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -49,7 +57,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`${isDarkMode ? 'dark' : ''} font-me_quran`}>
+    <div className={`${isDarkMode ? 'dark' : ''} ${fontClasses[font]}`}>
       <main className="min-h-screen flex flex-col items-center p-2">
         <h1 id="title">Quran Mushaf Reader</h1>
         <div id="controls">
@@ -58,6 +66,19 @@ export default function Home() {
               <label htmlFor="style-select" className="label-text">Style:</label>
               <select id="style-select" value={style} onChange={(e) => setStyle(e.target.value)}>
                 <option value="hafs-digital-khatt">Hafs Digital Khatt</option>
+                <option value="hafs">Hafs</option>
+                <option value="hisham-digital-khatt">Hisham Digital Khatt</option>
+                <option value="hisham">Hisham</option>
+                <option value="ibn-dhakwan-digital-khatt">Ibn Dhakwan Digital Khatt</option>
+                <option value="ibn-dhakwan">Ibn Dhakwan</option>
+                <option value="qpc-nastaleeq">QPC Nastaleeq</option>
+              </select>
+              <label htmlFor="font-select" className="label-text">Font:</label>
+              <select id="font-select" value={font} onChange={(e) => setFont(e.target.value)}>
+                <option value="me_quran">Me Quran</option>
+                <option value="indopak-nastaleeq">Indopak Nastaleeq</option>
+                <option value="qpc-nastaleeq">QPC Nastaleeq</option>
+                <option value="digitalkhatt">Digital Khatt</option>
               </select>
               <label htmlFor="page-input" className="label-text">Page:</label>
               <input
