@@ -22,8 +22,8 @@ export default function Home() {
   const [quranData, setQuranData] = useState<QuranData>({});
   const [pageNumber, setPageNumber] = useState(1);
   const [inputPage, setInputPage] = useState('1');
-  const [style, setStyle] = useState('hafs-digital-khatt');
-  const [font, setFont] = useState('me_quran');
+  const [style, setStyle] = useState('hafs');
+  const [font, setFont] = useState('digitalkhatt');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -65,20 +65,14 @@ export default function Home() {
             <div className="mb-4">
               <label htmlFor="style-select" className="label-text">Style:</label>
               <select id="style-select" value={style} onChange={(e) => setStyle(e.target.value)}>
-                <option value="hafs-digital-khatt">Hafs Digital Khatt</option>
                 <option value="hafs">Hafs</option>
-                <option value="hisham-digital-khatt">Hisham Digital Khatt</option>
                 <option value="hisham">Hisham</option>
-                <option value="ibn-dhakwan-digital-khatt">Ibn Dhakwan Digital Khatt</option>
                 <option value="ibn-dhakwan">Ibn Dhakwan</option>
-                <option value="qpc-nastaleeq">QPC Nastaleeq</option>
               </select>
               <label htmlFor="font-select" className="label-text">Font:</label>
               <select id="font-select" value={font} onChange={(e) => setFont(e.target.value)}>
-                <option value="me_quran">Me Quran</option>
-                <option value="indopak-nastaleeq">Indopak Nastaleeq</option>
-                <option value="qpc-nastaleeq">QPC Nastaleeq</option>
-                <option value="digitalkhatt">Digital Khatt</option>
+                <option value="hafs">Hafs</option>
+                <option value="digital-khatt">Digital Khatt</option>
               </select>
               <label htmlFor="page-input" className="label-text">Page:</label>
               <input

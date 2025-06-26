@@ -70,6 +70,33 @@
   font-display: block
 }
 
+.surah-name-v4-icon{
+  font-family: surah-name-v4-icon;
+}
+.surah-name-v4{
+  font-family: surah-name-v4;
+}
+.bismillah{
+  font-family: bismillah;
+  text-align:center;
+          font-size: clamp(20px, 3vw, 40px);
+}
+.surah-name{
+  position: relative;
+}
+.quran-icon{
+  font-family: quran-icon;
+          font-size: clamp(32px, 6vw, 80px);
+}
+.surah-icon{
+          direction: ltr;
+          position: absolute;
+          top: calc(50% - min(46px, 7vw));
+          left: calc(50% - 56px);
+          font-size: clamp(26px, 5vw, 48px);
+          width: 112px;
+}
+
 .quran-page {
   width: min-content;
   height: min-content;
