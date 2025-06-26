@@ -57,8 +57,16 @@ export default function Home() {
     setIsDarkMode(!isDarkMode);
   };
 
+  const dynamicStyles = `
+    #mushaf-display .quran-line {
+      font-family: ${font === '-digital-khatt' ? 'digitalkhatt' : 'me_quran'} !important;
+    }
+  `;
+
   return (
-    <div className={`${isDarkMode ? 'dark' : ''} ${fontClasses[font]}`}>
+    <>
+      <style>{dynamicStyles}</style>
+      <div className={`${isDarkMode ? 'dark' : ''}`}>
       <main className="min-h-screen flex flex-col items-center p-2">
         <h1 id="title">Quran Mushaf Reader</h1>
         <div id="controls">
@@ -104,7 +112,7 @@ export default function Home() {
           <div
             id="mushaf-display"
             className="quran-page"
-            style={{ 
+            style={{
               borderImageSource: "url('/borders/quran-border.png')",
               backgroundColor: isDarkMode ? '#222' : '#f8f0da',
               color: isDarkMode ? '#eee' : '#333'
@@ -124,6 +132,7 @@ export default function Home() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 

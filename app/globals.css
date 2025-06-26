@@ -70,31 +70,36 @@
   font-display: block
 }
 
-.surah-name-v4-icon{
-  font-family: surah-name-v4-icon;
+.surah-name-v4-icon {
+  font-family: 'surah-name-v4-icon';
 }
-.surah-name-v4{
-  font-family: surah-name-v4;
+
+.surah-name-v4 {
+  font-family: 'surah-name-v4';
 }
-.bismillah{
-  font-family: bismillah;
-  text-align:center;
-          font-size: clamp(20px, 3vw, 40px);
+
+.bismillah {
+  font-family: 'bismillah';
+  text-align: center;
+  font-size: clamp(20px, 3vw, 40px);
 }
-.surah-name{
+
+.surah-name {
   position: relative;
 }
-.quran-icon{
-  font-family: quran-icon;
-          font-size: clamp(32px, 6vw, 80px);
+
+.quran-icon {
+  font-family: 'quran-icon';
+  font-size: clamp(32px, 6vw, 80px);
 }
-.surah-icon{
-          direction: ltr;
-          position: absolute;
-          top: calc(50% - min(46px, 7vw));
-          left: calc(50% - 56px);
-          font-size: clamp(26px, 5vw, 48px);
-          width: 112px;
+
+.surah-icon {
+  direction: ltr;
+  position: absolute;
+  top: calc(50% - min(46px, 7vw));
+  left: calc(50% - 56px);
+  font-size: clamp(26px, 5vw, 48px);
+  width: 112px;
 }
 
 .quran-page {
@@ -112,6 +117,45 @@
   line-height: 2.5;
   font-size: 24px;
   box-sizing: border-box;
+}
+
+ 
+#mushaf-display {
+  width: min-content;
+  margin: auto;
+  direction: rtl; /* Essential for Arabic text */
+  text-align: justify; /* Helps align Arabic text cleanly */
+  line-height: 1.85; /* Adjust font size for readability */
+  border-radius: 12px;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+#mushaf-display .ayah{
+  width: fit-content;
+  margin: 0 auto;
+  padding-bottom: 4px;
+}
+
+#mushaf-display .word{
+  cursor: pointer;
+  display: inline-block;
+  padding-bottom: 8px;
+  /* width:100%; */
+}
+#mushaf-display .word .text:hover, #mushaf-display .arabic-num-marker:hover{
+  color: #46ac71;
+  border-bottom: 1px solid black;
+}
+
+.arabic-num-marker {
+  color: #0000FF;
+  padding: 0 3px;
+  cursor: pointer;
+}
+
+.red-text{
+  color:red;
 }
 
 #controls {
