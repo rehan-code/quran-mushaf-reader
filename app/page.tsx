@@ -23,17 +23,18 @@ export default function Home() {
   const [pageNumber, setPageNumber] = useState(1);
   const [inputPage, setInputPage] = useState('1');
   const [style, setStyle] = useState('hafs');
-  const [font, setFont] = useState('digitalkhatt');
+  const [font, setFont] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     async function fetchQuranData() {
-      const response = await fetch(`/quran-pages/data_${style}.json`);
+      const response = await fetch(`/quran-pages/data_${style}${font}.json`);
+      console.log(`/quran-pages/data_${style}${font}.json`);
       const data = await response.json();
       setQuranData(data.pages);
     }
     fetchQuranData();
-  }, [style]);
+  }, [style, font]);
 
   const pageContent = quranData[pageNumber];
 
@@ -71,8 +72,8 @@ export default function Home() {
               </select>
               <label htmlFor="font-select" className="label-text">Font:</label>
               <select id="font-select" value={font} onChange={(e) => setFont(e.target.value)}>
-                <option value="hafs">Hafs</option>
-                <option value="digital-khatt">Digital Khatt</option>
+                <option value="">Hafs</option>
+                <option value="-digital-khatt">Digital Khatt</option>
               </select>
               <label htmlFor="page-input" className="label-text">Page:</label>
               <input
