@@ -2,13 +2,50 @@
 
 import { useState, useEffect } from 'react';
 
-// Define the types for our data
-interface PageContent {
-  html_content: string;
+// Define the types for our enhanced data structure
+interface QuranLine {
+  lineNumber: number;
+  lineType: 'ayah' | 'surah_name' | 'basmallah';
+  isCentered: boolean;
+  text: string;
+  wordRange: {
+    first: number | null;
+    last: number | null;
+  };
+  surahNumber: number | null;
+  isIndicator: boolean;
+}
+
+interface QuranPage {
+  pageNumber: number;
+  filename: string;
+  lines: QuranLine[];
+  metadata: {
+    totalLines: number;
+    wordCount: number;
+    surahInfo: {
+      surahNumbers: number[];
+      surahNames: string[];
+      primarySurah: number | null;
+    };
+    hasAlignment: boolean;
+  };
 }
 
 interface QuranData {
-  [pageNumber: string]: PageContent;
+  metadata: {
+    totalPages: number;
+    style: string;
+    generatedAt: string;
+    description: string;
+    dataStructure: {
+      version: string;
+      features: string[];
+    };
+  };
+  pages: {
+    [pageNumber: string]: QuranPage;
+  };
 }
 
 const fontClasses: { [key: string]: string } = {
@@ -18,8 +55,91 @@ const fontClasses: { [key: string]: string } = {
     'digitalkhatt': 'font-digitalkhatt',
 };
 
+// Helper function to extract ayah number from Arabic numerals
+function extractAyahNumber(text: string): { cleanText: string; ayahNumber: string | null } {
+  const arabicNumerals = /[٠-٩]+/g;
+  const matches = text.match(arabicNumerals);
+  if (matches && matches.length > 0) {
+    const ayahNumber = matches[matches.length - 1]; // Get the last number (verse number)
+    const cleanText = text.replace(new RegExp(ayahNumber + '$'), '').trim();
+    return { cleanText, ayahNumber };
+  }
+  return { cleanText: text, ayahNumber: null };
+}
+
+// Helper function to split text into words and identify ayah boundaries
+function parseAyahText(text: string, wordRange: { first: number | null; last: number | null }): Array<{
+  word: string;
+  ayahNumber: string | null;
+  isAyahEnd: boolean;
+  ayahClass: string;
+}> {
+  // Split text by Arabic numerals to identify verse boundaries
+  const arabicNumerals = /[٠-٩]+/g;
+  const parts = text.split(arabicNumerals);
+  const numerals = text.match(arabicNumerals) || [];
+  
+  const parsedWords: Array<{
+    word: string;
+    ayahNumber: string | null;
+    isAyahEnd: boolean;
+    ayahClass: string;
+  }> = [];
+  
+  let currentAyahNumber = 1; // Start with ayah 1, will be incremented as we find verse markers
+  
+  parts.forEach((part, partIndex) => {
+    // Process words in this part
+    const words = part.split(/\s+/).filter(word => word.trim());
+    words.forEach(word => {
+      if (word.trim()) {
+        parsedWords.push({
+          word: word.trim(),
+          ayahNumber: null,
+          isAyahEnd: false,
+          ayahClass: `ayah-${currentAyahNumber}`
+        });
+      }
+    });
+    
+    // Add verse marker if there's a corresponding numeral
+    if (partIndex < numerals.length) {
+      const verseNumber = numerals[partIndex];
+      parsedWords.push({
+        word: '',
+        ayahNumber: verseNumber,
+        isAyahEnd: true,
+        ayahClass: `ayah-${currentAyahNumber}`
+      });
+      currentAyahNumber++; // Move to next ayah for subsequent words
+    }
+  });
+  
+  return parsedWords;
+}
+
+// Component to render surah header
+function SurahHeader({ surahNumber }: { surahNumber: number }) {
+  return (
+    <div className="surah-name">
+      <div className="quran-icon surah-header text-center flex justify-center">header</div>
+      <div className="surah-icon text-center flex justify-center">
+        <span className="surah-name-v4 me-2">surah{surahNumber.toString().padStart(3, '0')}</span>
+        <span className="surah-name-v4">surah-icon</span>
+      </div>
+    </div>
+  );
+}
+
+// Component to render basmallah
+function Basmallah() {
+  return (
+    <div className='bismillah text-center flex justify-center'> ﷽</div>
+  );
+}
+
 export default function Home() {
-  const [quranData, setQuranData] = useState<QuranData>({});
+  const [quranData, setQuranData] = useState<QuranData | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [inputPage, setInputPage] = useState('1');
   const [style, setStyle] = useState('hafs');
@@ -28,15 +148,15 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchQuranData() {
-      const response = await fetch(`/quran-pages/data_${style}${font}.json`);
-      console.log(`/quran-pages/data_${style}${font}.json`);
+      const response = await fetch(`/quran-pages/enhanced_data_${style}.json`);
+      console.log(`/quran-pages/enhanced_data_${style}.json`);
       const data = await response.json();
-      setQuranData(data.pages);
+      setQuranData(data);
     }
     fetchQuranData();
   }, [style, font]);
 
-  const pageContent = quranData[pageNumber];
+  const pageContent = quranData?.pages[pageNumber.toString()];
 
   const changePage = (delta: number) => {
     const newPage = pageNumber + delta;
@@ -119,9 +239,56 @@ export default function Home() {
             }}
           >
             {pageContent ? (
-              <div
-                dangerouslySetInnerHTML={{ __html: pageContent.html_content }}
-              />
+              <div className="quran-page-content">
+                {pageContent.lines.map((line, index) => {
+                  if (line.isIndicator) {
+                    // Render indicators (surah_name, basmallah)
+                    if (line.lineType === 'surah_name' && line.surahNumber) {
+                      return <SurahHeader key={index} surahNumber={line.surahNumber} />;
+                    } else if (line.lineType === 'basmallah') {
+                      return <Basmallah key={index} />;
+                    }
+                    return null;
+                  } else {
+                    // Render ayah lines with proper word structure
+                    const parsedWords = parseAyahText(line.text, line.wordRange);
+                    const alignmentClass = line.isCentered 
+                      ? 'text-center flex justify-center' 
+                      : 'flex justify-between';
+                    
+                    return (
+                      <p
+                        key={index}
+                        className={`quran-line ${alignmentClass}`}
+                        data-pag={pageNumber}
+                        data-line={line.lineNumber}
+                        data-first-word-id={line.wordRange.first}
+                        data-last-word-id={line.wordRange.last}
+                        id={`line-${pageNumber}-${line.lineNumber}`}
+                      >
+                        {parsedWords.map((wordData, wordIndex) => {
+                          if (wordData.isAyahEnd && wordData.ayahNumber) {
+                            // Render ayah number marker
+                            return (
+                              <span key={wordIndex} className="arabic-num-marker">
+                                {wordData.ayahNumber}
+                              </span>
+                            );
+                          } else if (wordData.word) {
+                            // Render regular word with proper ayah class
+                            return (
+                              <span key={wordIndex} className={`word ${wordData.ayahClass}`}>
+                                <span className="text">{wordData.word}</span>
+                              </span>
+                            );
+                          }
+                          return null;
+                        })}
+                      </p>
+                    );
+                  }
+                })}
+              </div>
             ) : (
               <p className="text-center">Loading Quran page...</p>
             )}
