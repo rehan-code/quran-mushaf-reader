@@ -5,30 +5,36 @@ import { useState, useEffect } from 'react';
 // Define the types for our enhanced data structure
 interface QuranLine {
   lineNumber: number;
-  lineType: 'ayah' | 'surah_name' | 'basmallah';
-  isCentered: boolean;
+  lineType: string;
   text: string;
+  words?: Array<{ text: string; isRed: boolean }>;
   wordRange: {
     first: number | null;
     last: number | null;
   };
-  surahNumber: number | null;
+  surahNumber?: number;
   isIndicator: boolean;
+}
+
+interface QuranNote {
+  text: string;
+  isRed: boolean;
 }
 
 interface QuranPage {
   pageNumber: number;
   filename: string;
+  isCentered: boolean;
   lines: QuranLine[];
+  notes: QuranNote[];
   metadata: {
     totalLines: number;
     wordCount: number;
-    surahInfo: {
-      surahNumbers: number[];
-      surahNames: string[];
-      primarySurah: number | null;
-    };
+    surahInfo: any;
     hasAlignment: boolean;
+    hasRedWords: boolean;
+    hasNotes: boolean;
+    notesCount: number;
   };
 }
 
@@ -138,6 +144,33 @@ function Basmallah() {
   );
 }
 
+// Component to render notes sidebar
+function NotesSidebar({ notes, isDarkMode }: { notes: QuranNote[], isDarkMode: boolean }) {
+  if (!notes || notes.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="w-[200px] p-5 h-[80vh] overflow-y-auto flex flex-col justify-center items-start">
+      {notes.map((note, index) => (
+        <div
+          className={`mb-2 text-base leading-relaxed`}
+          style={{
+            color: note.isRed 
+              ? '#ff0000' 
+              : isDarkMode 
+                ? '#e5e7eb' 
+                : '#1f2937'
+          }}
+          key={index}
+        >
+          {note.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [quranData, setQuranData] = useState<QuranData | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
@@ -148,8 +181,16 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchQuranData() {
-      const response = await fetch(`/quran-pages/enhanced_data_${style}.json`);
-      console.log(`/quran-pages/enhanced_data_${style}.json`);
+      // Determine the data file based on font and style
+      let dataFile;
+      if (font === '-digital-khatt') {
+        dataFile = `enhanced_data_${style}-digital-khatt.json`;
+      } else {
+        dataFile = `enhanced_data_${style}.json`;
+      }
+      
+      const response = await fetch(`/quran-pages/${dataFile}`);
+      console.log(`Loading: /quran-pages/${dataFile}`);
       const data = await response.json();
       setQuranData(data);
     }
@@ -226,73 +267,113 @@ export default function Home() {
           </div>
         </div>
 
-        <div
-          id="mushaf-display-container"
-          className={`content-wrapper ${isDarkMode ? 'dark' : ''}`}>
+        <div className="main-content-wrapper" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '20px', alignItems: 'start' }}>
+          {/* Left spacer */}
+          <div></div>
+          
+          {/* Centered Mushaf */}
           <div
-            id="mushaf-display"
-            className="quran-page"
-            style={{
-              borderImageSource: "url('/borders/quran-border.png')",
-              backgroundColor: isDarkMode ? '#222' : '#f8f0da',
-              color: isDarkMode ? '#eee' : '#333'
-            }}
+            id="mushaf-display-container"
+            className={`content-wrapper ${isDarkMode ? 'dark' : ''}`}
           >
-            {pageContent ? (
-              <div className="quran-page-content">
-                {pageContent.lines.map((line, index) => {
-                  if (line.isIndicator) {
-                    // Render indicators (surah_name, basmallah)
-                    if (line.lineType === 'surah_name' && line.surahNumber) {
-                      return <SurahHeader key={index} surahNumber={line.surahNumber} />;
-                    } else if (line.lineType === 'basmallah') {
-                      return <Basmallah key={index} />;
+            <div
+              id="mushaf-display"
+              className="quran-page"
+              style={{
+                borderImageSource: "url('/borders/quran-border.png')",
+                backgroundColor: isDarkMode ? '#222' : '#f8f0da',
+                color: isDarkMode ? '#eee' : '#333'
+              }}
+            >
+              {pageContent ? (
+                <div className="quran-page-content">
+                  {pageContent.lines.map((line, index) => {
+                    if (line.isIndicator) {
+                      // Render indicators (surah_name, basmallah)
+                      if (line.lineType === 'surah_name' && line.surahNumber) {
+                        return <SurahHeader key={index} surahNumber={line.surahNumber} />;
+                      } else if (line.lineType === 'basmallah') {
+                        return <Basmallah key={index} />;
+                      }
+                      return null;
+                    } else {
+                      // Render ayah lines with proper word structure
+                      const alignmentClass = pageContent.isCentered 
+                        ? 'text-center flex justify-center' 
+                        : 'flex justify-between';
+                      
+                      return (
+                        <p
+                          key={index}
+                          className={`quran-line ${alignmentClass}`}
+                          data-page={pageNumber}
+                          data-line={line.lineNumber}
+                          data-first-word-id={line.wordRange.first}
+                          data-last-word-id={line.wordRange.last}
+                          id={`line-${pageNumber}-${line.lineNumber}`}
+                        >
+                          {line.words && line.words.length > 0 ? (
+                            // Use structured words data if available
+                            line.words.map((wordData, wordIndex) => {
+                              // Check if this word is an Arabic numeral (ayah marker)
+                              const isArabicNumeral = /^[٠-٩]+$/.test(wordData.text.trim());
+                              
+                              if (isArabicNumeral) {
+                                const isDigitalKhatt = font === '-digital-khatt' && style === 'hafs';
+                                return (
+                                  <span key={wordIndex} className="arabic-num-marker">
+                                    {wordData.text}{isDigitalKhatt ? '۝' : ''}
+                                  </span>
+                                );
+                              } else {
+                                return (
+                                  <span 
+                                    key={wordIndex} 
+                                    className={`word ${wordData.isRed ? 'red-text' : ''}`}
+                                  >
+                                    <span className="text">{wordData.text}</span>
+                                  </span>
+                                );
+                              }
+                            })
+                          ) : (
+                            // Fallback to parsing text if words data not available
+                            parseAyahText(line.text, line.wordRange).map((wordData, wordIndex) => {
+                              if (wordData.isAyahEnd && wordData.ayahNumber) {
+                                // Add ۝ symbol after ayah numbers for hafs-digital-khatt
+                                const isDigitalKhatt = font === '-digital-khatt' && style === 'hafs';
+                                return (
+                                  <span key={wordIndex} className="arabic-num-marker">
+                                    {wordData.ayahNumber}{isDigitalKhatt ? '۝' : ''}
+                                  </span>
+                                );
+                              } else if (wordData.word) {
+                                return (
+                                  <span key={wordIndex} className={`word ${wordData.ayahClass}`}>
+                                    <span className="text">{wordData.word}</span>
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })
+                          )}
+                        </p>
+                      );
                     }
-                    return null;
-                  } else {
-                    // Render ayah lines with proper word structure
-                    const parsedWords = parseAyahText(line.text, line.wordRange);
-                    const alignmentClass = line.isCentered 
-                      ? 'text-center flex justify-center' 
-                      : 'flex justify-between';
-                    
-                    return (
-                      <p
-                        key={index}
-                        className={`quran-line ${alignmentClass}`}
-                        data-pag={pageNumber}
-                        data-line={line.lineNumber}
-                        data-first-word-id={line.wordRange.first}
-                        data-last-word-id={line.wordRange.last}
-                        id={`line-${pageNumber}-${line.lineNumber}`}
-                      >
-                        {parsedWords.map((wordData, wordIndex) => {
-                          if (wordData.isAyahEnd && wordData.ayahNumber) {
-                            // Render ayah number marker
-                            return (
-                              <span key={wordIndex} className="arabic-num-marker">
-                                {wordData.ayahNumber}
-                              </span>
-                            );
-                          } else if (wordData.word) {
-                            // Render regular word with proper ayah class
-                            return (
-                              <span key={wordIndex} className={`word ${wordData.ayahClass}`}>
-                                <span className="text">{wordData.word}</span>
-                              </span>
-                            );
-                          }
-                          return null;
-                        })}
-                      </p>
-                    );
-                  }
-                })}
-              </div>
-            ) : (
-              <p className="text-center">Loading Quran page...</p>
-            )}
+                  })}
+                </div>
+              ) : (
+                <p>Loading page content...</p>
+              )}
+            </div>
           </div>
+          
+          {/* Right side - Notes or spacer */}
+          {pageContent && pageContent.notes && pageContent.notes.length > 0 ? (
+            <NotesSidebar notes={pageContent.notes} isDarkMode={isDarkMode} />
+          ) : (
+            <div></div>
+          )}
         </div>
         <div className="text-center mt-2 font-bold">
           <p>{pageNumber}</p>

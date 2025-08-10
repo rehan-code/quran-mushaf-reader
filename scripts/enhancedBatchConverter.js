@@ -10,11 +10,12 @@ const { parse } = require('csv-parse');
  * Creates a comprehensive JSON structure optimized for web rendering
  */
 
+const qiraat = 'hafs-digital-khatt'; // hafs / hisham / ibn-dhakwan / qpc-nastaleeq / hafs-digital-khatt / hisham-digital-khatt / ibn-dhakwan-digital-khatt
+
 const CONFIG = {
-    qiraat: 'hafs', // hafs / hisham / ibn-dhakwan / qpc-nastaleeq / hafs-digital-khatt / hisham-digital-khatt / ibn-dhakwan-digital-khatt
-    inputDirectory: `quran-styles/${CONFIG.qiraat}`,
+    inputDirectory: `quran-styles/${qiraat}`,
     csvFile: 'quran-styles/pages.csv',
-    outputFile: `public/quran-pages/enhanced_data_${CONFIG.qiraat}.json`,
+    outputFile: `public/quran-pages/enhanced_data_${qiraat}.json`,
     isDebugging: true
 };
 
@@ -65,9 +66,9 @@ async function parseCsvData(csvFilePath) {
 }
 
 /**
- * Convert a single DOCX file to structured content with highlighting information
+ * Convert a single DOCX file to structured content with highlighting information and notes
  * @param {string} filePath - Path to the DOCX file
- * @returns {Array} Array of text content with highlighting markers
+ * @returns {Object} Object containing text content and notes with highlighting markers
  */
 async function convertSingleDocx(filePath) {
     try {
@@ -96,7 +97,12 @@ async function convertSingleDocx(filePath) {
                                         textElement.value = '';
                                     }
                                 }
-                                if (textElement.value.toLowerCase().includes('note')) {
+                                // Check for notes section
+                                if (textElement.value && (
+                                    textElement.value.toLowerCase().includes('note') ||
+                                    textElement.value.toLowerCase().includes('ملاحظة') ||
+                                    textElement.value.toLowerCase().includes('ملاحظات')
+                                )) {
                                     notesIndex = paragraphIdx;
                                 }
                                 // Mark highlighted text with special markers for red words
@@ -115,15 +121,18 @@ async function convertSingleDocx(filePath) {
         const html = result.value;
         const $ = cheerio.load(html);
         
-        const textContent = [];
+        const allContent = [];
         $('body > *').each((i, element) => {
             const text = $(element).text().trim();
             if (text) {
-                textContent.push(text);
+                allContent.push(text);
             }
         });
 
-        return textContent;
+        // Separate main content from notes
+        const { textContent, notes } = separateContentAndNotes(allContent);
+
+        return { textContent, notes };
 
     } catch (error) {
         if (CONFIG.isDebugging) {
@@ -131,6 +140,43 @@ async function convertSingleDocx(filePath) {
         }
         throw error;
     }
+}
+
+/**
+ * Separate main content from notes section
+ * @param {Array} allContent - Array of all text content from DOCX
+ * @returns {Object} Object with textContent and notes arrays
+ */
+function separateContentAndNotes(allContent) {
+    const textContent = [];
+    const notes = [];
+    let inNotesSection = false;
+    
+    for (const line of allContent) {
+        const lowerLine = line.toLowerCase();
+        
+        // Check if this line starts the notes section
+        if (lowerLine.includes('note') || lowerLine.includes('ملاحظة') || lowerLine.includes('ملاحظات')) {
+            inNotesSection = true;
+            continue; // Skip the "Notes:" header line
+        }
+        
+        if (inNotesSection) {
+            // Everything after "Notes:" goes into notes array
+            if (line.trim()) {
+                const hasRedWords = /<RED>/.test(line);
+                notes.push({
+                    text: line.replace(/<RED>(.*?)<\/RED>/g, '$1'), // Clean text for display
+                    isRed: hasRedWords // Simple boolean flag for the entire note
+                });
+            }
+        } else {
+            // Main Quran content
+            textContent.push(line);
+        }
+    }
+    
+    return { textContent, notes };
 }
 
 /**
@@ -326,8 +372,9 @@ async function enhancedBatchConvert(inputDir, csvFile, outputFile) {
                     console.log(`📖 Processing page ${file.pageNumber} (${file.filename})...`);
                 }
 
-                // Get text content from DOCX
-                const textContent = await convertSingleDocx(file.fullPath);
+                // Convert DOCX to text content and notes
+                const docxResult = await convertSingleDocx(file.fullPath);
+                const { textContent, notes } = docxResult;
                 
                 // Get alignment data from CSV
                 const csvLines = csvData[file.pageNumber] || [];
@@ -346,6 +393,7 @@ async function enhancedBatchConvert(inputDir, csvFile, outputFile) {
                     filename: file.filename,
                     isCentered: isCentered,
                     lines: mergedLines,
+                    notes: notes, // Include extracted notes
                     metadata: {
                         totalLines: mergedLines.length,
                         wordCount: mergedLines.reduce((count, line) => {
@@ -353,7 +401,9 @@ async function enhancedBatchConvert(inputDir, csvFile, outputFile) {
                         }, 0),
                         surahInfo: surahInfo,
                         hasAlignment: csvLines.length > 0,
-                        hasRedWords: mergedLines.some(line => line.words && line.words.some(word => word.isRed))
+                        hasRedWords: mergedLines.some(line => line.words && line.words.some(word => word.isRed)),
+                        hasNotes: notes.length > 0,
+                        notesCount: notes.length
                     }
                 };
 
@@ -373,7 +423,16 @@ async function enhancedBatchConvert(inputDir, csvFile, outputFile) {
                     isCentered: true, // Default to centered for error cases
                     error: error.message,
                     lines: [],
-                    metadata: { totalLines: 0, wordCount: 0, surahInfo: {}, hasAlignment: false, hasRedWords: false }
+                    notes: [], // Empty notes array for error cases
+                    metadata: { 
+                        totalLines: 0, 
+                        wordCount: 0, 
+                        surahInfo: {}, 
+                        hasAlignment: false, 
+                        hasRedWords: false,
+                        hasNotes: false,
+                        notesCount: 0
+                    }
                 };
             }
         }
