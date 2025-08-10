@@ -11,9 +11,10 @@ const { parse } = require('csv-parse');
  */
 
 const CONFIG = {
-    inputDirectory: 'quran-styles/hafs',
+    qiraat: 'hafs', // hafs / hisham / ibn-dhakwan / qpc-nastaleeq / hafs-digital-khatt / hisham-digital-khatt / ibn-dhakwan-digital-khatt
+    inputDirectory: `quran-styles/${CONFIG.qiraat}`,
     csvFile: 'quran-styles/pages.csv',
-    outputFile: 'public/quran-pages/enhanced_data_hafs.json',
+    outputFile: `public/quran-pages/enhanced_data_${CONFIG.qiraat}.json`,
     isDebugging: true
 };
 
@@ -64,9 +65,9 @@ async function parseCsvData(csvFilePath) {
 }
 
 /**
- * Convert a single DOCX file to structured content
+ * Convert a single DOCX file to structured content with highlighting information
  * @param {string} filePath - Path to the DOCX file
- * @returns {Array} Array of text content
+ * @returns {Array} Array of text content with highlighting markers
  */
 async function convertSingleDocx(filePath) {
     try {
@@ -82,8 +83,10 @@ async function convertSingleDocx(filePath) {
                             run.children.forEach(textElement => {
                                 if (notesIndex > -1) {
                                     let existingText = '';
+                                    // Mark highlighted text with special markers for red words
                                     if (run.highlight && textElement.value && textElement.value.trim() && /[\w\d\u0600-\u06FF]/.test(textElement.value)) {
-                                        existingText = `~${run.highlight}~[${textElement.value}]`;
+                                        // Use a consistent marker for red/highlighted words
+                                        existingText = `<RED>${textElement.value}</RED>`;
                                     }
                                     combinedText += existingText !== '' ? existingText : textElement.value;
                                     if (combinedTextIndex === -1) {
@@ -96,8 +99,9 @@ async function convertSingleDocx(filePath) {
                                 if (textElement.value.toLowerCase().includes('note')) {
                                     notesIndex = paragraphIdx;
                                 }
+                                // Mark highlighted text with special markers for red words
                                 if (run.highlight && textElement.value && textElement.value.trim() && /[\w\d\u0600-\u06FF]/.test(textElement.value)) {
-                                    textElement.value = `~${run.highlight}~[${textElement.value}]`;
+                                    textElement.value = `<RED>${textElement.value}</RED>`;
                                 }
                             });
                         }
@@ -158,50 +162,83 @@ async function getDocxFiles(directoryPath) {
 }
 
 /**
+ * Parse text to extract red words and create word structure
+ * @param {string} text - Text with red word markers
+ * @returns {Array} Array of word objects with red word indicators
+ */
+function parseTextWithRedWords(text) {
+    const words = [];
+    const redWordRegex = /<RED>(.*?)<\/RED>/g;
+    let lastIndex = 0;
+    let match;
+    
+    // Find all red words and their positions
+    while ((match = redWordRegex.exec(text)) !== null) {
+        // Add normal words before the red word
+        const beforeText = text.substring(lastIndex, match.index).trim();
+        if (beforeText) {
+            beforeText.split(/\s+/).forEach(word => {
+                if (word.trim()) {
+                    words.push({ text: word.trim(), isRed: false });
+                }
+            });
+        }
+        
+        // Add the red word
+        words.push({ text: match[1].trim(), isRed: true });
+        lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining normal words after the last red word
+    const afterText = text.substring(lastIndex).trim();
+    if (afterText) {
+        afterText.split(/\s+/).forEach(word => {
+            if (word.trim()) {
+                words.push({ text: word.trim(), isRed: false });
+            }
+        });
+    }
+    
+    return words;
+}
+
+/**
  * Merge DOCX text content with CSV alignment data
- * Only ayah lines use text from DOCX, other line types are indicators
  * @param {Array} textContent - Array of text lines from DOCX
- * @param {Array} csvLines - Array of alignment data from CSV
+ * @param {Array} csvLines - Array of CSV line data
  * @returns {Array} Merged line data
  */
 function mergeContentWithAlignment(textContent, csvLines) {
     const mergedLines = [];
-    let ayahTextIndex = 0; // Track which ayah text line we're on
+    let docxLineIndex = 0;
     
     for (const csvLine of csvLines) {
         let lineText = '';
-        let isRenderable = true;
+        let words = [];
         
-        switch (csvLine.lineType) {
-            case 'ayah':
-                // Use text from DOCX for ayah lines
-                lineText = textContent[ayahTextIndex] || '';
-                ayahTextIndex++;
-                break;
-                
-            case 'surah_name':
-                // Indicator for surah name - will be rendered based on surah number
-                lineText = `[SURAH_NAME:${csvLine.surahNumber}]`;
-                break;
-                
-            case 'basmallah':
-                // Indicator for basmallah - standard text
-                lineText = '[BASMALLAH]';
-                break;
-                
-            default:
-                // Unknown line type
-                lineText = `[${csvLine.lineType.toUpperCase()}]`;
-                break;
+        if (csvLine.lineType === 'ayah') {
+            // For ayah lines, use text from DOCX and parse for red words
+            if (docxLineIndex < textContent.length) {
+                lineText = textContent[docxLineIndex];
+                words = parseTextWithRedWords(lineText);
+                // Clean the text for display (remove red markers)
+                lineText = lineText.replace(/<RED>(.*?)<\/RED>/g, '$1');
+                docxLineIndex++;
+            }
+        } else if (csvLine.lineType === 'surah_name') {
+            // For surah name lines, create an indicator
+            lineText = `[SURAH_NAME:${csvLine.surahNumber}]`;
+        } else if (csvLine.lineType === 'basmallah') {
+            // For basmallah lines, create an indicator
+            lineText = '[BASMALLAH]';
         }
         
-        // Only add lines that have content or are meaningful indicators
-        if (lineText.trim()) {
+        if (lineText) {
             mergedLines.push({
                 lineNumber: csvLine.lineNumber,
                 lineType: csvLine.lineType,
-                isCentered: csvLine.isCentered,
                 text: lineText,
+                words: words, // Include parsed words with red indicators
                 wordRange: {
                     first: csvLine.firstWordId,
                     last: csvLine.lastWordId
@@ -229,6 +266,20 @@ function getPageSurahInfo(lines) {
         surahNames: surahNames,
         primarySurah: surahNumbers[0] || null
     };
+}
+
+/**
+ * Determine if a page should be centered based on its lines
+ * @param {Array} csvLines - Array of CSV line data for the page
+ * @returns {boolean} Whether the page should be centered
+ */
+function getPageCentering(csvLines) {
+    // A page is centered if the majority of its ayah lines are centered
+    const ayahLines = csvLines.filter(line => line.lineType === 'ayah');
+    if (ayahLines.length === 0) return true; // Default to centered if no ayah lines
+    
+    const centeredCount = ayahLines.filter(line => line.isCentered).length;
+    return centeredCount > ayahLines.length / 2;
 }
 
 /**
@@ -287,9 +338,13 @@ async function enhancedBatchConvert(inputDir, csvFile, outputFile) {
                 // Get surah information for this page
                 const surahInfo = getPageSurahInfo(mergedLines);
                 
+                // Determine if this page should be centered
+                const isCentered = getPageCentering(csvLines);
+                
                 quranData.pages[file.pageNumber] = {
                     pageNumber: file.pageNumber,
                     filename: file.filename,
+                    isCentered: isCentered,
                     lines: mergedLines,
                     metadata: {
                         totalLines: mergedLines.length,
@@ -297,7 +352,8 @@ async function enhancedBatchConvert(inputDir, csvFile, outputFile) {
                             return count + (line.text ? line.text.split(/\s+/).length : 0);
                         }, 0),
                         surahInfo: surahInfo,
-                        hasAlignment: csvLines.length > 0
+                        hasAlignment: csvLines.length > 0,
+                        hasRedWords: mergedLines.some(line => line.words && line.words.some(word => word.isRed))
                     }
                 };
 
@@ -314,9 +370,10 @@ async function enhancedBatchConvert(inputDir, csvFile, outputFile) {
                 quranData.pages[file.pageNumber] = {
                     pageNumber: file.pageNumber,
                     filename: file.filename,
+                    isCentered: true, // Default to centered for error cases
                     error: error.message,
                     lines: [],
-                    metadata: { totalLines: 0, wordCount: 0, surahInfo: {}, hasAlignment: false }
+                    metadata: { totalLines: 0, wordCount: 0, surahInfo: {}, hasAlignment: false, hasRedWords: false }
                 };
             }
         }
