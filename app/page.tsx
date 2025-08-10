@@ -316,13 +316,14 @@ export default function Home() {
                             // Use structured words data if available
                             line.words.map((wordData, wordIndex) => {
                               // Check if this word is an Arabic numeral (ayah marker)
-                              const isArabicNumeral = /^[٠-٩]+$/.test(wordData.text.trim());
+                              // Check if this is an ayah marker (Arabic numeral with optional decoration character)
+                              const isArabicNumeral = /^[۝]*[٠-٩]+$/.test(wordData.text.trim());
                               
                               if (isArabicNumeral) {
-                                const isDigitalKhatt = font === '-digital-khatt' && style === 'hafs';
+                                console.log(wordData.text);
                                 return (
                                   <span key={wordIndex} className="arabic-num-marker">
-                                    {wordData.text}{isDigitalKhatt ? '۝' : ''}
+                                    {wordData.text}
                                   </span>
                                 );
                               } else {
@@ -340,11 +341,9 @@ export default function Home() {
                             // Fallback to parsing text if words data not available
                             parseAyahText(line.text, line.wordRange).map((wordData, wordIndex) => {
                               if (wordData.isAyahEnd && wordData.ayahNumber) {
-                                // Add ۝ symbol after ayah numbers for hafs-digital-khatt
-                                const isDigitalKhatt = font === '-digital-khatt' && style === 'hafs';
                                 return (
                                   <span key={wordIndex} className="arabic-num-marker">
-                                    {wordData.ayahNumber}{isDigitalKhatt ? '۝' : ''}
+                                    {wordData.ayahNumber}
                                   </span>
                                 );
                               } else if (wordData.word) {
